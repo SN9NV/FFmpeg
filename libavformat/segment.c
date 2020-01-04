@@ -192,6 +192,26 @@ FF_ENABLE_DEPRECATION_WARNINGS
     return 0;
 }
 
+static size_t strftime_micro_now(char *s, size_t max, const char *format)
+{
+    struct  timespec now0;
+    struct  tm *tm;
+    size_t  result;
+    char    *temp_name;
+
+    clock_gettime(CLOCK_REALTIME, &now0);
+    tm = localtime(&now0.tv_sec);
+    if (tm == NULL)
+        return 0;
+
+    temp_name = malloc(max);
+    strftime(temp_name, max, format, tm);
+    result = snprintf(s, max, temp_name, now0.tv_nsec / 1000);
+    free(temp_name);
+
+    return result;
+}
+
 static int set_segment_filename(AVFormatContext *s)
 {
     SegmentContext *seg = s->priv_data;
@@ -204,11 +224,7 @@ static int set_segment_filename(AVFormatContext *s)
     if (seg->segment_idx_wrap)
         seg->segment_idx %= seg->segment_idx_wrap;
     if (seg->use_strftime) {
-        time_t now0;
-        struct tm *tm, tmpbuf;
-        time(&now0);
-        tm = localtime_r(&now0, &tmpbuf);
-        if (!strftime(buf, sizeof(buf), s->url, tm)) {
+        if (!strftime_micro_now(buf, sizeof(buf), s->url)) {
             av_log(oc, AV_LOG_ERROR, "Could not get segment filename with strftime\n");
             return AVERROR(EINVAL);
         }
